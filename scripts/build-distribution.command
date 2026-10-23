@@ -10,6 +10,7 @@ RELEASE_DIR="${DIST_DIR}/release"
 SUPPORT_ROOT="${PKG_ROOT}/Applications/UniVPN-Isolation"
 APP_DESTINATION="${PKG_ROOT}/Applications/UniVPN Isolation.app"
 COMPONENT_PKG="${COMPONENT_DIR}/UniVPN-Isolation.pkg"
+COMPONENT_PLIST="${COMPONENT_DIR}/component.plist"
 FINAL_PKG="${RELEASE_DIR}/UniVPN-Isolation-${VERSION}-arm64.pkg"
 IMAGE_ARCHIVE="${PROJECT_ROOT}/vendor/univpn-isolation-arm64.oci.tar"
 CHECKSUM_FILE="${PROJECT_ROOT}/vendor/SHA256SUMS"
@@ -135,8 +136,22 @@ done
 /usr/bin/xattr -cr "${PKG_ROOT}"
 /usr/bin/codesign --verify --deep --strict --verbose=2 "${APP_DESTINATION}"
 
+# Component packages relocate bundles by identifier unless told otherwise. An
+# older development copy may have the same bundle identifier, so explicitly
+# pin the menu bar app to /Applications instead of allowing Installer to update
+# whichever matching copy Spotlight finds first.
+/usr/bin/pkgbuild --analyze --root "${PKG_ROOT}" "${COMPONENT_PLIST}"
+component_bundle_path="$(/usr/bin/plutil -extract '0.RootRelativeBundlePath' raw -o - "${COMPONENT_PLIST}")"
+[[ "${component_bundle_path}" == "Applications/UniVPN Isolation.app" ]] \
+    || fail "组件分析返回了意外的 App 路径：${component_bundle_path}"
+/usr/bin/plutil -replace '0.BundleIsRelocatable' -bool NO "${COMPONENT_PLIST}"
+component_relocatable="$(/usr/bin/plutil -extract '0.BundleIsRelocatable' raw -o - "${COMPONENT_PLIST}")"
+[[ "${component_relocatable}" == "false" ]] \
+    || fail "未能禁止 Installer 重定位菜单栏 App。"
+
 pkgbuild_args=(
     --root "${PKG_ROOT}"
+    --component-plist "${COMPONENT_PLIST}"
     --scripts "${PROJECT_ROOT}/packaging/scripts"
     --identifier com.yxyuanxiao.univpn-isolation
     --version "${VERSION}"
