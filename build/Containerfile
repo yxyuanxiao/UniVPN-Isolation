@@ -1,0 +1,61 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        dante-server \
+        iproute2 \
+        libdbus-1-3 \
+        libfontconfig1 \
+        libglapi-mesa \
+        libglib2.0-0 \
+        libharfbuzz0b \
+        libice6 \
+        libproxy1v5 \
+        libsm6 \
+        libx11-6 \
+        libx11-xcb1 \
+        libxcb-icccm4 \
+        libxcb-image0 \
+        libxcb-keysyms1 \
+        libxcb-randr0 \
+        libxcb-render-util0 \
+        libxcb-render0 \
+        libxcb-shape0 \
+        libxcb-shm0 \
+        libxcb-sync1 \
+        libxcb-xfixes0 \
+        libxcb-xinerama0 \
+        libxcb-xkb1 \
+        libxcb1 \
+        libxi6 \
+        libxkbcommon-x11-0 \
+        libxkbcommon0 \
+        netcat-openbsd \
+        novnc \
+        openbox \
+        procps \
+        websockify \
+        x11-xserver-utils \
+        x11vnc \
+        xcompmgr \
+        xdotool \
+        xvfb \
+    && rm -rf /var/lib/apt/lists/*
+
+ADD univpn-data-root.tar /
+COPY libgmcrypto.so /usr/lib/libgmcrypto.so
+COPY danted.conf /etc/univpn-danted.conf
+COPY entrypoint.sh /usr/local/sbin/univpn-container-entrypoint
+
+RUN chmod 0755 /usr/local/sbin/univpn-container-entrypoint \
+    && mkdir -p \
+        /opt/apps/cn.com.huawei-security-commercial-alliance.univpn/files/certificate \
+        /root/.config/cn.com.huawei-security-commercial-alliance.univpn \
+    && chmod 0755 /opt/apps/cn.com.huawei-security-commercial-alliance.univpn/files/certificate \
+    && cp /opt/apps/cn.com.huawei-security-commercial-alliance.univpn/files/fonts/Alibaba-PuHuiTi-Regular.otf /usr/share/fonts/
+
+EXPOSE 5900 6080
+
+ENTRYPOINT ["/usr/local/sbin/univpn-container-entrypoint"]

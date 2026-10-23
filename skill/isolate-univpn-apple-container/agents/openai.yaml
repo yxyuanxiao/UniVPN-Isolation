@@ -1,0 +1,4 @@
+interface:
+  display_name: "隔离 UniVPN 与菜单栏 App"
+  short_description: "隔离 UniVPN、构建菜单栏 App，并仅转发指定内网流量"
+  default_prompt: "Use $isolate-univpn-apple-container to deploy the isolated UniVPN runtime and build its native macOS menu bar App on an Apple silicon Mac."

@@ -1,0 +1,25 @@
+.DS_Store
+
+# Swift build cache and generated products
+app/.build/
+app/.swiftpm/
+dist/
+DerivedData/
+*.pkg
+*.dmg
+
+# Host-specific runtime state and recovery data
+state/
+*.log
+
+# Apple Container runtime and exported OCI images are release inputs, not source.
+runtime/
+vendor/*.tar
+vendor/*.tar.gz
+vendor/SHA256SUMS
+
+# Vendor binaries are intentionally kept out of Git history.
+build/*.deb
+build/*.tar
+build/*.tar.*
+build/*.so

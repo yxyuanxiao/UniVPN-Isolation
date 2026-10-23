@@ -1,0 +1,15 @@
+#!/bin/zsh
+set -euo pipefail
+
+support_root="/Applications/UniVPN-Isolation"
+
+/bin/chmod 0755 \
+    "${support_root}/setup-runtime.command" \
+    "${support_root}/start.command" \
+    "${support_root}/stop.command" \
+    "${support_root}/status.command" \
+    "${support_root}/ssh-proxy.command"
+
+print "UniVPN Isolation 已安装。"
+print "请以登录用户身份运行 ${support_root}/setup-runtime.command 完成首次初始化。"
+exit 0
