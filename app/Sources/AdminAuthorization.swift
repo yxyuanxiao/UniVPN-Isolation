@@ -1,4 +1,6 @@
 import Foundation
+import Security
+import SystemConfiguration
 
 enum AdministratorAuthorization {
     enum AuthorizationError: LocalizedError {
@@ -42,20 +44,52 @@ enum AdministratorAuthorization {
 
     @MainActor
     static func restoreProxy(_ snapshot: ProxySnapshot) throws {
-        let bypass = snapshot.bypassDomains.isEmpty ? ["Empty"] : snapshot.bypassDomains
-        var commands: [[String]] = []
-        commands.append([
-            "/usr/sbin/networksetup", "-setautoproxyurl", snapshot.networkService,
-            snapshot.autoProxyURL
-        ])
-        commands.append([
-            "/usr/sbin/networksetup", "-setproxybypassdomains", snapshot.networkService
-        ] + bypass)
-        commands.append([
-            "/usr/sbin/networksetup", "-setautoproxystate", snapshot.networkService,
-            snapshot.autoProxyEnabled ? "on" : "off"
-        ])
-        try run(commands)
+        var authorization: AuthorizationRef?
+        let status = AuthorizationCreate(nil, nil, [], &authorization)
+        guard status == errAuthorizationSuccess, let authorization else {
+            throw AuthorizationError.failed("无法创建网络设置授权（\(status)）。")
+        }
+        defer { AuthorizationFree(authorization, []) }
+
+        guard let preferences = SCPreferencesCreateWithAuthorization(
+            nil, "UniVPN Isolation" as CFString, nil, authorization
+        ) else {
+            throw proxyError("读取网络设置")
+        }
+        guard SCPreferencesLock(preferences, false) else {
+            throw proxyError("锁定网络设置")
+        }
+        defer { SCPreferencesUnlock(preferences) }
+
+        // Other network locations may contain another service named Wi-Fi.
+        // networksetup addresses the current location, so restore that one.
+        guard let networkSet = SCNetworkSetCopyCurrent(preferences),
+              let services = SCNetworkSetCopyServices(networkSet) as? [SCNetworkService] else {
+            throw proxyError("读取当前网络位置")
+        }
+        let matches = services.filter { (SCNetworkServiceGetName($0) as String?) == snapshot.networkService }
+        guard matches.count == 1, let service = matches.first,
+              let proxies = SCNetworkServiceCopyProtocol(service, kSCNetworkProtocolTypeProxies) else {
+            throw AuthorizationError.failed("无法唯一定位网络服务“\(snapshot.networkService)”的代理设置；恢复快照已保留。")
+        }
+
+        let current = (SCNetworkProtocolGetConfiguration(proxies) as? [String: Any]) ?? [:]
+        let restored = try ProxyRestoration.configuration(restoring: snapshot, in: current)
+        guard SCNetworkProtocolSetConfiguration(proxies, restored as CFDictionary) else {
+            throw proxyError("恢复代理设置")
+        }
+        guard SCPreferencesCommitChanges(preferences) else {
+            throw proxyError("保存代理设置")
+        }
+        guard SCPreferencesApplyChanges(preferences) else {
+            throw proxyError("应用代理设置")
+        }
+    }
+
+    private static func proxyError(_ action: String) -> AuthorizationError {
+        let code = SCError()
+        let detail = String(cString: SCErrorString(code))
+        return .failed("\(action)失败：\(detail)（\(code)）。恢复快照已保留，请重试。")
     }
 
     @MainActor

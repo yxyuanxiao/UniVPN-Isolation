@@ -249,7 +249,7 @@ enum Backend {
             allowFailure: true
         ).output
 
-        let url = value(after: "URL:", in: autoProxy) ?? ""
+        let url = autoProxyURL(from: autoProxy)
         let enabledText = value(after: "Enabled:", in: autoProxy)?.lowercased() ?? "no"
         let noBypassMessage = bypass.lowercased().contains("aren't any bypass domains")
             || bypass.lowercased().contains("there are no bypass domains")
@@ -272,6 +272,12 @@ enum Backend {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         try encoder.encode(snapshot).write(to: paths.recoverySnapshot, options: .atomic)
+    }
+
+    static func autoProxyURL(from output: String) -> String {
+        let url = value(after: "URL:", in: output) ?? ""
+        // networksetup uses this sentinel when the optional URL key is absent.
+        return url == "(null)" ? "" : url
     }
 
     static func loadProxySnapshot(paths: ProjectPaths) throws -> ProxySnapshot? {

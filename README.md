@@ -40,11 +40,13 @@ App 当前使用 [macOS Icons 上的 Ivacy VPN 图标（T6s4AC9Km1）](https://m
 
 App 启动 VPN 前会把当前网络服务的 PAC URL、PAC 开关和代理绕过列表保存到 `~/Library/Application Support/UniVPN Isolation/proxy-before-start.json`。它会先显示登录窗口，等 `cnem_vnic` 与受限 SOCKS 真正就绪后再通过管理员授权启用并刷新 PAC，避免浏览器在 VPN 尚未连接时把 `127.0.0.1:15902` 记为不可用代理。PAC 由同一个回环 noVNC 服务通过 `http://127.0.0.1:16080/univpn.pac` 提供，避免 Chromium 忽略本地 `file://` PAC 后错误落到 Clash `7897`。该端点和 noVNC 一样只发布在本机 `127.0.0.1`。停止时通过 macOS 管理员授权原样恢复；恢复成功后才删除快照。
 
+0.2.6 修复停止时 `** Error: The parameters were not valid.`：启动前未配置 PAC 地址时，通过 SystemConfiguration 删除 PAC URL 键并恢复关闭状态及绕过列表，避免向 `networksetup` 传入空 URL。恢复操作只修改本 App 管理的 PAC 和绕过字段，保留 Clash 的 HTTP、HTTPS、SOCKS 等其他配置。
+
 如果 App 第一次打开时容器已经由旧 `start.command` 启动，它只观察该会话，不会伪造恢复快照。菜单里的“用旧脚本停止本次会话…”用于完成这一次过渡；之后由 App 启动的会话都由 App 精确恢复。
 
 “重启隔离连接…”会先确认当前没有其他运行中的 Apple Container，再停止当前容器、重启 Apple Container 后台并重新启动同一个容器。它保留 `univpn-config` 卷以及 App 的代理恢复快照；重启后若再次出现服务器证书提示，仍需人工检查并确认。若检测到其他运行容器，App 会拒绝重启后台，避免中断无关工作。
 
-如果浏览器曾在 VPN 连接前访问内网，它可能暂时把受限 SOCKS 记为不可用并使用 PAC 的 `DIRECT` 回退。连接成功后选择“重新加载分流 PAC…”，授权后再刷新页面即可清除这种状态；普通启动和重启流程也会在 SOCKS 就绪后自动执行同样的刷新。
+0.2.7 起，是否代理由手动启停隔离 VPN 决定：启动并完成登录、启用本应用 PAC 后，`10.10.128.*` 的网页和 SSH 连接使用 UniVPN；停止并恢复代理设置后直连。仅打开菜单栏 App 不会启用代理。隔离已启用但 VPN 暂时断线时，目标网段连接失败，不自动回退直连，也不根据是否身处内网自动切换。连接恢复后可选择“重新加载分流 PAC…”并刷新页面。
 
 某些冷启动中，Apple Container 的管理端口会先恢复，而公网 NAT 约需几十秒才可用。普通启动和重启流程都会检查真实 VPN 网关 `210.75.253.1:443`；若第一次检查时网关尚不可达，就等 NAT 就绪后只重启当前容器一次，再交还登录界面。这样可以避免 UniVPN 在公网出口未就绪时耗掉唯一一次自动拨号。
 
@@ -110,10 +112,13 @@ ssh 10.10.128.2_main
 
 规则调用本目录的 `ssh-proxy.command`：
 
-- `127.0.0.1:15902` 可用时，SSH 自动通过隔离容器的受限 SOCKS 连接；
-- SOCKS 不可用时，SSH 自动直连，适用于电脑已经直接接入内网；
+- 本应用 PAC 分流开关已启用时，SSH 通过隔离容器的受限 SOCKS 连接；
+- 隔离分流未启用时，SSH 直接连接，哪怕本地 SOCKS 端口仍在监听；
+- 隔离分流已启用但 SOCKS 不可用时，连接失败，不自动改为直连；
 - 该规则只匹配 `10.10.128.*`，不会影响其他 SSH 主机；
 - `ping` 仍不会经过 SOCKS，因为它使用 ICMP 而不是 TCP。
+
+只读检查当前 SSH 选择：`/usr/sbin/scutil --proxy | ./ssh-proxy.command --routing-mode`，输出为 `proxy` 或 `direct`。切换影响新建连接，已有 SSH 会话不会迁移路径。
 
 ## 数据流
 

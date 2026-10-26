@@ -6,10 +6,10 @@ function FindProxyForURL(url, host) {
     var address = isIPv4Literal(host) ? host : dnsResolve(host);
 
     // Only this exact subnet is offered to the isolated UniVPN SOCKS service.
-    // DIRECT is the fail-open fallback when the container is stopped or when
-    // the laptop is already connected to the internal network.
+    // This PAC is enabled only by the user's isolation switch. A disconnected
+    // VPN must not silently change that choice to a direct connection.
     if (address && isInNet(address, "10.10.128.0", "255.255.255.0")) {
-        return "SOCKS5 127.0.0.1:15902; SOCKS 127.0.0.1:15902; DIRECT";
+        return "SOCKS5 127.0.0.1:15902; SOCKS 127.0.0.1:15902";
     }
 
     // Preserve direct access to all other local/private destinations.
